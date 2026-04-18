@@ -303,8 +303,8 @@ must reproduce this exactly, including the truncation.
 - [x] **Step 1**  SwiftPM scaffold (`Package.swift`, empty targets, `swift build` green)
 - [ ] **Step 2**  `Constants.swift` + all `Tables/*.swift` ported from `Src/Global.c`
 - [ ] **Step 3**  `Models/*.swift` ported from `Src/DataTypes.h`
-- [ ] **Step 4**  `Systems/RNG.swift` + `RNGTests` green against fixture
-- [ ] **Step 5**  `Systems/Distance.swift` + `DistanceTests`
+- [x] **Step 4**  `Systems/RNG.swift` + `RNGTests` green against fixture *(completed 2026-04-18, ahead of Steps 2–3 — pure algorithm port with no data dependency, and landing it first immediately validated the Step-0.C golden vector)*
+- [x] **Step 5**  `Systems/Distance.swift` + `DistanceTests` *(completed 2026-04-18, same rationale as Step 4)*
 - [ ] **Step 6**  `GameState.swift` skeleton (properties only)
 - [ ] **Step 7**  `Systems/Money.swift` + `MoneyTests`
 - [ ] **Step 8**  `Systems/Fuel.swift` + `FuelTests`
@@ -389,7 +389,10 @@ labels, police records, reputations, mercenaries, weapons, shields,
 gadgets, system names). Keep everything `static let` on enum types so
 the data is compile-time and can be indexed by the raw enums that Step 3
 will add. No behavior in this step — just data + unit-test sanity checks
-on lengths (e.g. `Tradeitems.count == MAXTRADEITEM`).
+on lengths (e.g. `Tradeitems.count == MAXTRADEITEM`). Steps 4 and 5 were
+landed ahead of this one because they have no dependency on the tables;
+Step 2 is the right next item for the data-heavy systems (Fuel, Ship
+pricing, Skill) that follow.
 
 ## Progress log
 
@@ -399,3 +402,5 @@ on lengths (e.g. `Tradeitems.count == MAXTRADEITEM`).
 - [2026-04-18] Step 0.B — Installed Swift 6.0.3 (Ubuntu 24.04 native) directly from `download.swift.org`; `swiftly init` hit an Apple CDN 403 so it was skipped. Notes: `swift --version` → 6.0.3; 5.9 `swift-tools-version` still accepted. Branch switched to `claude/space-trader-swift-port-fHRgv`.
 - [2026-04-18] Step 0.C — Captured RNG golden vector via `rand_harness.c` compiled with gcc; three seed pairs, 16 outputs each, saved to `Tests/SpaceTraderCoreTests/Fixtures/rand_seed_default.txt`. Harness is checked in so parity can be re-verified from C any time.
 - [2026-04-18] Step 1 — SwiftPM scaffold landed: `Swift/Package.swift` with `SpaceTraderCore` library + `SpaceTraderCoreTests` (smoke test passes, fixture copied as a resource). `swift build` + `swift test` both green on Linux. iOS executable target deferred to Step 13.
+- [2026-04-18] Step 4 — `Systems/RNG.swift` bit-identical to `Src/Math.c` on all 3 fixture seed pairs × 16 outputs. Port notes in source comments cover the UInt16-width subtleties in the C expressions. Tests: 4 cases, all green. Landed ahead of Steps 2/3 (explicitly noted in the checklist).
+- [2026-04-18] Step 5 — `Systems/Distance.swift` mirrors `sqrt`/`SqrDistance`/`RealDistance` in `Src/Math.c:42-72`, including the tie-break rounding. Tests: 5 cases covering perfect squares, tie rounding, negatives, and pythagorean triples. All 10 tests green.
