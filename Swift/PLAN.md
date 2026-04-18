@@ -220,7 +220,32 @@ news, high-score UI, options screen, character creation flow.
 1. Ensure you are on branch `claude/port-game-to-swift-DMVPS`.
 2. `Swift/PLAN.md` is this file. Committing it satisfies 0.A.
 
-**0.B — Install Swift in the container.**
+**0.B — Install Swift in the container. [BLOCKED 2026-04-18]**
+
+Attempted and failed. The harness network ACL blocks
+`download.swift.org` (403 `host_not_allowed`) and this is enforced above
+the Bash sandbox — `dangerouslyDisableSandbox: true` does not override it.
+Neither Ubuntu `apt` (no `swift-lang` package on noble), GitHub releases
+(swiftly ships source-only, binaries live on the blocked host), nor Docker
+Hub (no daemon in this container) provides a viable fallback.
+
+Hosts probed:
+- `download.swift.org` → 403 `host_not_allowed`
+- `swift.org` → 302 (redirects to blocked host)
+- `apt.llvm.org` → 403
+- `github.com`, `archive.ubuntu.com`, `pypi.org`, `ghcr.io`,
+  `registry-1.docker.io`, `raw.githubusercontent.com`,
+  `codeload.github.com` → reachable but don't host the toolchain
+
+**Fallback in effect: write-blind + verify-on-Mac.** Swift code for this
+phase is authored in the container without a local compiler. The user runs
+`swift build` / `swift test` on macOS (Xcode 15+) once code lands on the
+branch. The RNG fixture (Step 0.C) is unaffected because it uses C + gcc,
+which is present locally.
+
+If a future session has `download.swift.org` on its allowlist, it can
+simply run the install block below and flip 0.B from `[~]` to `[x]`:
+
 ```bash
 curl -fsSLO https://download.swift.org/swiftly/linux/swiftly-x86_64.tar.gz
 mkdir -p ~/.local/bin
@@ -228,11 +253,8 @@ tar -xzf swiftly-x86_64.tar.gz -C ~/.local/bin
 ~/.local/bin/swiftly init --quiet-shell-followup --assume-yes
 . "${SWIFTLY_HOME_DIR:-$HOME/.local/share/swiftly}/env.sh"
 swiftly install 5.9 && swiftly use 5.9
-swift --version        # expect: Swift version 5.9.x
+swift --version
 ```
-If `download.swift.org` is blocked at the sandbox level, retry with
-`dangerouslyDisableSandbox: true` on the Bash call (requires user OK), or
-fall back to `apt install swift-lang`.
 
 **0.C — Capture the RNG golden vector.**
 Compile `Src/Math.c` with a tiny `harness.c` (stubs for Palm-only calls as
@@ -244,7 +266,7 @@ the fixture together so parity can be re-verified later.
 ## Implementation step checklist
 
 - [x] **Step 0.A** Publish `Swift/PLAN.md` to the branch
-- [ ] **Step 0.B** Install Swift 5.9 via `swiftly`
+- [~] **Step 0.B** Install Swift 5.9 via `swiftly` — **blocked**, see note below
 - [ ] **Step 0.C** Capture RNG golden vector from C
 - [ ] **Step 1**  SwiftPM scaffold (`Package.swift`, empty targets, `swift build` green)
 - [ ] **Step 2**  `Constants.swift` + all `Tables/*.swift` ported from `Src/Global.c`
@@ -301,9 +323,10 @@ iOS UI verification (manual, Mac required):
 
 ## Risks / open items
 
-- **`swiftly` install needs network egress** to `download.swift.org` and
-  `swift.org`. If the sandbox blocks it, fall back to `apt install
-  swift-lang`, and last resort write blind and run `swift test` on a Mac.
+- **Swift toolchain unreachable from this container** (confirmed
+  2026-04-18). Fallback in effect: write Swift code blind, verify on Mac.
+  See Step 0.B for details. This limits feedback loop but doesn't change
+  the deliverable — all Swift files are text that Xcode will compile.
 - **RNG parity**: gcc is present in the container, so the C harness can run
   here directly; no Mac needed for the golden vector.
 - **iOS target won't compile on Linux.** `#if canImport(UIKit)` /
@@ -326,9 +349,12 @@ iOS UI verification (manual, Mac required):
 
 ## Next up
 
-**Step 0.B** — Install Swift 5.9 via `swiftly` in the dev container.
+**Step 0.C** — Capture the RNG golden vector from `Src/Math.c` using gcc
+in this container. (Step 0.B is blocked; see note above. Verification of
+Swift code now happens on the user's Mac via Xcode / `swift test`.)
 
 ## Progress log
 
 <!-- newest entries at bottom -->
 - [2026-04-18] Step 0.A — Published `Swift/PLAN.md`. `5de109c`. Notes: authoritative plan file committed; branch ready for handoff.
+- [2026-04-18] Step 0.B — **blocked**. Harness ACL denies `download.swift.org`; no viable in-container install path (apt, GitHub releases, Docker all dead ends). Fallback: write blind, verify Swift on Mac. C/gcc path for Step 0.C is unaffected.
