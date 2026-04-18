@@ -301,7 +301,7 @@ must reproduce this exactly, including the truncation.
 - [x] **Step 0.B** Install Swift toolchain (6.0.3 direct-tarball on Ubuntu 24.04; `swiftly` unused — Apple CDN 403 on metadata)
 - [x] **Step 0.C** Capture RNG golden vector from C
 - [x] **Step 1**  SwiftPM scaffold (`Package.swift`, empty targets, `swift build` green)
-- [ ] **Step 2**  `Constants.swift` + all `Tables/*.swift` ported from `Src/Global.c`
+- [x] **Step 2**  `Constants.swift` + all `Tables/*.swift` ported from `Src/Global.c`
 - [ ] **Step 3**  `Models/*.swift` ported from `Src/DataTypes.h`
 - [x] **Step 4**  `Systems/RNG.swift` + `RNGTests` green against fixture *(completed 2026-04-18, ahead of Steps 2–3 — pure algorithm port with no data dependency, and landing it first immediately validated the Step-0.C golden vector)*
 - [x] **Step 5**  `Systems/Distance.swift` + `DistanceTests` *(completed 2026-04-18, same rationale as Step 4)*
@@ -382,17 +382,14 @@ iOS UI verification (manual, Mac required):
 
 ## Next up
 
-**Step 2** — Port `Constants.swift` + the lookup tables in
-`Sources/SpaceTraderCore/Tables/` from `Src/spacetrader.h` and
-`Src/Global.c` (trade items, ship types, politics, status/activity
-labels, police records, reputations, mercenaries, weapons, shields,
-gadgets, system names). Keep everything `static let` on enum types so
-the data is compile-time and can be indexed by the raw enums that Step 3
-will add. No behavior in this step — just data + unit-test sanity checks
-on lengths (e.g. `Tradeitems.count == MAXTRADEITEM`). Steps 4 and 5 were
-landed ahead of this one because they have no dependency on the tables;
-Step 2 is the right next item for the data-heavy systems (Fuel, Ship
-pricing, Skill) that follow.
+**Step 3** — Port `Models/*.swift` from `Src/DataTypes.h`. The small
+record structs (TradeItem, ShipType, WeaponType, ShieldType, GadgetType,
+Politics, PoliceRecord, ReputationTier) already landed alongside Step 2
+because the tables couldn't exist without them; Step 3 adds the bigger
+runtime structs: `Ship`, `CrewMember`, `SolarSystem`, `SpecialEvent`,
+`HighScore`, and the composite `SaveGame` (C's `SAVEGAMETYPE`). All
+conform to `Codable` and `Sendable` so they can be JSON-persisted
+(Step 12) and hold up under future Swift-concurrency tightening.
 
 ## Progress log
 
@@ -404,3 +401,4 @@ pricing, Skill) that follow.
 - [2026-04-18] Step 1 — SwiftPM scaffold landed: `Swift/Package.swift` with `SpaceTraderCore` library + `SpaceTraderCoreTests` (smoke test passes, fixture copied as a resource). `swift build` + `swift test` both green on Linux. iOS executable target deferred to Step 13.
 - [2026-04-18] Step 4 — `Systems/RNG.swift` bit-identical to `Src/Math.c` on all 3 fixture seed pairs × 16 outputs. Port notes in source comments cover the UInt16-width subtleties in the C expressions. Tests: 4 cases, all green. Landed ahead of Steps 2/3 (explicitly noted in the checklist).
 - [2026-04-18] Step 5 — `Systems/Distance.swift` mirrors `sqrt`/`SqrDistance`/`RealDistance` in `Src/Math.c:42-72`, including the tie-break rounding. Tests: 5 cases covering perfect squares, tie rounding, negatives, and pythagorean triples. All 10 tests green.
+- [2026-04-18] Step 2 — `Constants.swift` (game limits, indices, scores) + Tables (`TradeItems`, `ShipTypes`, `Weapons`, `Shields`, `Gadgets`, `PoliticsTable`, `Labels`, `PoliceRecords`, `Reputations`, `Mercenaries`, `SystemNames`). Record struct shapes landed alongside so tables could hold data; Ship/CrewMember/SolarSystem/SaveGame remain in Step 3. 8 new `TablesTests` (18/18 overall); sizes all match `MAXTRADEITEM`, `MAXSHIPTYPE+EXTRASHIPS`, etc.
