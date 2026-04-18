@@ -331,3 +331,4 @@ iOS UI verification (manual, Mac required):
 ## Progress log
 
 <!-- newest entries at bottom -->
+- [2026-04-18] Step 0.A — Published `Swift/PLAN.md`. `5de109c`. Notes: authoritative plan file committed; branch ready for handoff.
