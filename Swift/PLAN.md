@@ -302,7 +302,7 @@ must reproduce this exactly, including the truncation.
 - [x] **Step 0.C** Capture RNG golden vector from C
 - [x] **Step 1**  SwiftPM scaffold (`Package.swift`, empty targets, `swift build` green)
 - [x] **Step 2**  `Constants.swift` + all `Tables/*.swift` ported from `Src/Global.c`
-- [ ] **Step 3**  `Models/*.swift` ported from `Src/DataTypes.h`
+- [x] **Step 3**  `Models/*.swift` ported from `Src/DataTypes.h`
 - [x] **Step 4**  `Systems/RNG.swift` + `RNGTests` green against fixture *(completed 2026-04-18, ahead of Steps 2–3 — pure algorithm port with no data dependency, and landing it first immediately validated the Step-0.C golden vector)*
 - [x] **Step 5**  `Systems/Distance.swift` + `DistanceTests` *(completed 2026-04-18, same rationale as Step 4)*
 - [ ] **Step 6**  `GameState.swift` skeleton (properties only)
@@ -382,14 +382,14 @@ iOS UI verification (manual, Mac required):
 
 ## Next up
 
-**Step 3** — Port `Models/*.swift` from `Src/DataTypes.h`. The small
-record structs (TradeItem, ShipType, WeaponType, ShieldType, GadgetType,
-Politics, PoliceRecord, ReputationTier) already landed alongside Step 2
-because the tables couldn't exist without them; Step 3 adds the bigger
-runtime structs: `Ship`, `CrewMember`, `SolarSystem`, `SpecialEvent`,
-`HighScore`, and the composite `SaveGame` (C's `SAVEGAMETYPE`). All
-conform to `Codable` and `Sendable` so they can be JSON-persisted
-(Step 12) and hold up under future Swift-concurrency tightening.
+**Step 6** — `GameState.swift` skeleton. Wrap the runtime state
+(SaveGame + UI-session extras) in an `ObservableObject` class and give
+it a single `reset()` that installs `SaveGame()`'s defaults. The Money,
+Fuel, Bank, ShipPrice, Skill systems in Steps 7–11 will be methods on
+`GameState`; getting the skeleton in first keeps each follow-up step
+small. (Step 12's JSON round-trip is already partially covered by
+`ModelsTests.testSaveGameJSONRoundTripIsByteIdentical`; the dedicated
+`PersistenceTests` will add FileManager / UserDefaults coverage.)
 
 ## Progress log
 
@@ -402,3 +402,4 @@ conform to `Codable` and `Sendable` so they can be JSON-persisted
 - [2026-04-18] Step 4 — `Systems/RNG.swift` bit-identical to `Src/Math.c` on all 3 fixture seed pairs × 16 outputs. Port notes in source comments cover the UInt16-width subtleties in the C expressions. Tests: 4 cases, all green. Landed ahead of Steps 2/3 (explicitly noted in the checklist).
 - [2026-04-18] Step 5 — `Systems/Distance.swift` mirrors `sqrt`/`SqrDistance`/`RealDistance` in `Src/Math.c:42-72`, including the tie-break rounding. Tests: 5 cases covering perfect squares, tie rounding, negatives, and pythagorean triples. All 10 tests green.
 - [2026-04-18] Step 2 — `Constants.swift` (game limits, indices, scores) + Tables (`TradeItems`, `ShipTypes`, `Weapons`, `Shields`, `Gadgets`, `PoliticsTable`, `Labels`, `PoliceRecords`, `Reputations`, `Mercenaries`, `SystemNames`). Record struct shapes landed alongside so tables could hold data; Ship/CrewMember/SolarSystem/SaveGame remain in Step 3. 8 new `TablesTests` (18/18 overall); sizes all match `MAXTRADEITEM`, `MAXSHIPTYPE+EXTRASHIPS`, etc.
+- [2026-04-18] Step 3 — `Models/Ship.swift`, `CrewMember.swift`, `SolarSystem.swift`, `SpecialEvent.swift`, `HighScore.swift`, `SaveGame.swift` (C's SAVEGAMETYPE minus Palm-only fields). All conform to Codable + Sendable + Hashable. `SaveGame()` builds a 32-slot mercenary roster and a 120-slot galaxy using the index-matched default constructors. 7 new `ModelsTests` including a JSON-round-trip on a populated SaveGame that asserts byte-identical re-encode; 25/25 green overall.
