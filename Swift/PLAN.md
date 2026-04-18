@@ -10,6 +10,25 @@ Any Claude Code session picking up this work should:
 4. Work through it. When done, tick the box, append a line to the
    "Progress log" at the bottom, update "Next up", and commit.
 
+## How to resume (for the next session)
+
+The previous session (2026-04-18) was unable to install Swift because the
+harness network ACL denied `download.swift.org`. **Before starting this
+session, confirm that your environment can reach `download.swift.org` and
+`swift.org`.** Quick probe:
+
+```bash
+curl -sI -o /dev/null -w "%{http_code}\n" https://download.swift.org/
+# Expect: 200 or 3xx. If 403 with x-deny-reason: host_not_allowed, stop
+# and have the user update the project environment / allowlist before
+# continuing.
+```
+
+If the probe returns a non-403 code, go straight to **Step 0.B (retry)**
+in the checklist below. Follow the install block in the "Step 0" section
+of this file, then proceed through 0.C → 1 → 2 → …, updating checkboxes
+and Progress log as you go.
+
 ---
 
 ## Context
@@ -220,31 +239,21 @@ news, high-score UI, options screen, character creation flow.
 1. Ensure you are on branch `claude/port-game-to-swift-DMVPS`.
 2. `Swift/PLAN.md` is this file. Committing it satisfies 0.A.
 
-**0.B — Install Swift in the container. [BLOCKED 2026-04-18]**
+**0.B — Install Swift in the container.**
 
-Attempted and failed. The harness network ACL blocks
-`download.swift.org` (403 `host_not_allowed`) and this is enforced above
-the Bash sandbox — `dangerouslyDisableSandbox: true` does not override it.
-Neither Ubuntu `apt` (no `swift-lang` package on noble), GitHub releases
-(swiftly ships source-only, binaries live on the blocked host), nor Docker
-Hub (no daemon in this container) provides a viable fallback.
+*Attempted 2026-04-18 in session `session_01K2XHvzPSr73VrSw9HmrMhc` and
+deferred.* The harness network ACL in that session blocked
+`download.swift.org` (403 `host_not_allowed`) and this block was enforced
+above the Bash sandbox (`dangerouslyDisableSandbox: true` did not override
+it). Apt (`swift-lang` not in Ubuntu noble), GitHub releases (swiftly
+ships source-only there), and Docker Hub (no daemon) were also dead ends.
 
-Hosts probed:
-- `download.swift.org` → 403 `host_not_allowed`
-- `swift.org` → 302 (redirects to blocked host)
-- `apt.llvm.org` → 403
-- `github.com`, `archive.ubuntu.com`, `pypi.org`, `ghcr.io`,
-  `registry-1.docker.io`, `raw.githubusercontent.com`,
-  `codeload.github.com` → reachable but don't host the toolchain
+**The user has chosen to resume in a new session with environment
+settings that permit access to `download.swift.org` / `swift.org`** rather
+than write Swift code without a local compiler. Tests must be runnable in
+the container for this project.
 
-**Fallback in effect: write-blind + verify-on-Mac.** Swift code for this
-phase is authored in the container without a local compiler. The user runs
-`swift build` / `swift test` on macOS (Xcode 15+) once code lands on the
-branch. The RNG fixture (Step 0.C) is unaffected because it uses C + gcc,
-which is present locally.
-
-If a future session has `download.swift.org` on its allowlist, it can
-simply run the install block below and flip 0.B from `[~]` to `[x]`:
+Once the new session is attached, run this to satisfy 0.B:
 
 ```bash
 curl -fsSLO https://download.swift.org/swiftly/linux/swiftly-x86_64.tar.gz
@@ -253,8 +262,11 @@ tar -xzf swiftly-x86_64.tar.gz -C ~/.local/bin
 ~/.local/bin/swiftly init --quiet-shell-followup --assume-yes
 . "${SWIFTLY_HOME_DIR:-$HOME/.local/share/swiftly}/env.sh"
 swiftly install 5.9 && swiftly use 5.9
-swift --version
+swift --version        # expect: Swift version 5.9.x
 ```
+
+Then tick the 0.B checkbox, append a Progress log entry, and proceed to
+Step 0.C.
 
 **0.C — Capture the RNG golden vector.**
 Compile `Src/Math.c` with a tiny `harness.c` (stubs for Palm-only calls as
@@ -266,7 +278,7 @@ the fixture together so parity can be re-verified later.
 ## Implementation step checklist
 
 - [x] **Step 0.A** Publish `Swift/PLAN.md` to the branch
-- [~] **Step 0.B** Install Swift 5.9 via `swiftly` — **blocked**, see note below
+- [ ] **Step 0.B** Install Swift 5.9 via `swiftly` — **deferred to a new session with network allowlist for `download.swift.org`** (see note)
 - [ ] **Step 0.C** Capture RNG golden vector from C
 - [ ] **Step 1**  SwiftPM scaffold (`Package.swift`, empty targets, `swift build` green)
 - [ ] **Step 2**  `Constants.swift` + all `Tables/*.swift` ported from `Src/Global.c`
@@ -323,10 +335,11 @@ iOS UI verification (manual, Mac required):
 
 ## Risks / open items
 
-- **Swift toolchain unreachable from this container** (confirmed
-  2026-04-18). Fallback in effect: write Swift code blind, verify on Mac.
-  See Step 0.B for details. This limits feedback loop but doesn't change
-  the deliverable — all Swift files are text that Xcode will compile.
+- **Swift toolchain must be installable in the container.** A prior
+  session (2026-04-18) hit a harness ACL denying `download.swift.org` and
+  paused. The user is setting up a new session/environment with that host
+  allowlisted so tests can run in-container. **Do not fall back to blind
+  authoring** — the project requires running tests alongside the code.
 - **RNG parity**: gcc is present in the container, so the C harness can run
   here directly; no Mac needed for the golden vector.
 - **iOS target won't compile on Linux.** `#if canImport(UIKit)` /
@@ -349,12 +362,14 @@ iOS UI verification (manual, Mac required):
 
 ## Next up
 
-**Step 0.C** — Capture the RNG golden vector from `Src/Math.c` using gcc
-in this container. (Step 0.B is blocked; see note above. Verification of
-Swift code now happens on the user's Mac via Xcode / `swift test`.)
+**Step 0.B (retry)** — In a fresh session whose environment allows
+`download.swift.org`, run the `swiftly` install block in the 0.B section
+above, verify `swift --version` reports 5.9.x, tick the checkbox, log
+progress. Then proceed to **Step 0.C** (RNG golden vector via gcc) and
+Step 1 (SwiftPM scaffold).
 
 ## Progress log
 
 <!-- newest entries at bottom -->
 - [2026-04-18] Step 0.A — Published `Swift/PLAN.md`. `5de109c`. Notes: authoritative plan file committed; branch ready for handoff.
-- [2026-04-18] Step 0.B — **blocked**. Harness ACL denies `download.swift.org`; no viable in-container install path (apt, GitHub releases, Docker all dead ends). Fallback: write blind, verify Swift on Mac. C/gcc path for Step 0.C is unaffected.
+- [2026-04-18] Step 0.B — **paused**. Harness ACL denies `download.swift.org`; no viable in-container install path (apt, GitHub releases, Docker all dead ends). User will resume in a fresh session whose environment allowlists `download.swift.org` / `swift.org`. No Swift code was written in this session; branch state is the plan file only.
