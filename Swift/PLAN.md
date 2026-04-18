@@ -305,8 +305,8 @@ must reproduce this exactly, including the truncation.
 - [x] **Step 3**  `Models/*.swift` ported from `Src/DataTypes.h`
 - [x] **Step 4**  `Systems/RNG.swift` + `RNGTests` green against fixture *(completed 2026-04-18, ahead of Steps 2–3 — pure algorithm port with no data dependency, and landing it first immediately validated the Step-0.C golden vector)*
 - [x] **Step 5**  `Systems/Distance.swift` + `DistanceTests` *(completed 2026-04-18, same rationale as Step 4)*
-- [ ] **Step 6**  `GameState.swift` skeleton (properties only)
-- [ ] **Step 7**  `Systems/Money.swift` + `MoneyTests`
+- [x] **Step 6**  `GameState.swift` skeleton (properties only)
+- [x] **Step 7**  `Systems/Money.swift` + `MoneyTests`
 - [ ] **Step 8**  `Systems/Fuel.swift` + `FuelTests`
 - [ ] **Step 9**  `Systems/Bank.swift` + `BankTests`
 - [ ] **Step 10** `Systems/ShipPrice.swift` + `ShipPriceTests`
@@ -382,14 +382,12 @@ iOS UI verification (manual, Mac required):
 
 ## Next up
 
-**Step 6** — `GameState.swift` skeleton. Wrap the runtime state
-(SaveGame + UI-session extras) in an `ObservableObject` class and give
-it a single `reset()` that installs `SaveGame()`'s defaults. The Money,
-Fuel, Bank, ShipPrice, Skill systems in Steps 7–11 will be methods on
-`GameState`; getting the skeleton in first keeps each follow-up step
-small. (Step 12's JSON round-trip is already partially covered by
-`ModelsTests.testSaveGameJSONRoundTripIsByteIdentical`; the dedicated
-`PersistenceTests` will add FileManager / UserDefaults coverage.)
+**Step 8** — `Systems/Fuel.swift` + `FuelTests`. Port `getFuelTanks`,
+`getFuel`, and `buyFuel` from `Src/Fuel.c`. Key rule: tank capacity is
+normally the ship type's `FuelTanks`, but if the commander has the
+`FUELCOMPACTOR` gadget (index 5 from Constants.swift) the cap jumps to
+18 (see `Src/Fuel.c:50-53`). `buyFuel` needs to clamp to both credits
+and remaining capacity.
 
 ## Progress log
 
@@ -403,3 +401,5 @@ small. (Step 12's JSON round-trip is already partially covered by
 - [2026-04-18] Step 5 — `Systems/Distance.swift` mirrors `sqrt`/`SqrDistance`/`RealDistance` in `Src/Math.c:42-72`, including the tie-break rounding. Tests: 5 cases covering perfect squares, tie rounding, negatives, and pythagorean triples. All 10 tests green.
 - [2026-04-18] Step 2 — `Constants.swift` (game limits, indices, scores) + Tables (`TradeItems`, `ShipTypes`, `Weapons`, `Shields`, `Gadgets`, `PoliticsTable`, `Labels`, `PoliceRecords`, `Reputations`, `Mercenaries`, `SystemNames`). Record struct shapes landed alongside so tables could hold data; Ship/CrewMember/SolarSystem/SaveGame remain in Step 3. 8 new `TablesTests` (18/18 overall); sizes all match `MAXTRADEITEM`, `MAXSHIPTYPE+EXTRASHIPS`, etc.
 - [2026-04-18] Step 3 — `Models/Ship.swift`, `CrewMember.swift`, `SolarSystem.swift`, `SpecialEvent.swift`, `HighScore.swift`, `SaveGame.swift` (C's SAVEGAMETYPE minus Palm-only fields). All conform to Codable + Sendable + Hashable. `SaveGame()` builds a 32-slot mercenary roster and a 120-slot galaxy using the index-matched default constructors. 7 new `ModelsTests` including a JSON-round-trip on a populated SaveGame that asserts byte-identical re-encode; 25/25 green overall.
+- [2026-04-18] Step 6 — `GameState.swift` ObservableObject wrapping a `SaveGame`, plus forwarding accessors (`credits`, `debt`, `ship`, `commander`, `currentSystem`, `moonBought`) and a `reset()` that installs defaults. Combine guarded behind `#if canImport(Combine)` so Linux `swift test` still compiles; on iOS the published property drives UI.
+- [2026-04-18] Step 7 — `Systems/Money.swift`: `currentWorth` mirrors Money.c:46-49 exactly (including the MoonBought + COSTMOON branch) and takes `shipPrice` as a parameter so Money has no hidden dependency on ShipPrice (Step 10). `payInterest` is faithful to Money.c:55-70 including the subtle strict `>` comparison on credits vs. incDebt. 11 new MoneyTests covering currentWorth permutations, zero-debt no-op, minimum-interest-of-1 clamp, equal-credits-vs-interest else branch, broke commander rolling into debt, partial drain, and two GameState forwarders. Fixed one test bug in review (asserted 11_000 where C gives 10_000 at the boundary). 36/36 green.
