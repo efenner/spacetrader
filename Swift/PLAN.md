@@ -4,7 +4,10 @@ This is the authoritative, committed plan for porting `Space Trader 1.2.2`
 (Pieter Spronck, GPLv2, Palm/C) to an iPhone app written in Swift + SwiftUI.
 
 Any Claude Code session picking up this work should:
-1. Check out branch `claude/port-game-to-swift-DMVPS`.
+1. Check out the active feature branch. The 2026-04-18 continuation
+   session was spun up on `claude/space-trader-swift-port-fHRgv`; all
+   Swift work lives there now (the original `claude/port-game-to-swift-DMVPS`
+   branch was abandoned after the toolchain-install blocker).
 2. Read this file end-to-end.
 3. Find the next unchecked item under "Implementation step checklist".
 4. Work through it. When done, tick the box, append a line to the
@@ -52,8 +55,13 @@ User selections that shape the plan:
 - **Scope**: Foundation + core systems + 2–3 screens.
 - **Art**: SF Symbols / text placeholders for now; bitmaps come later.
 - **Verification**: Swift unit tests via `swift test`, run **inside the
-  Linux dev container** after installing Swift 5.9 via `swiftly` as Step 0.
-  Final iOS app verification happens in Xcode on a Mac.
+  Linux dev container** after installing a Swift toolchain as Step 0.
+  (The 2026-04-18 session installed Swift 6.0.3 — the Ubuntu 24.04-native
+  build — because `swiftly`'s metadata API was blocked by an Apple CDN ACL
+  while direct `download.swift.org` tarball downloads worked. The original
+  plan called for Swift 5.9 via `swiftly`; 6.0.3 is strictly newer and
+  accepts `// swift-tools-version:5.9` packages, so Phase-1 parity is
+  preserved.) Final iOS app verification happens in Xcode on a Mac.
 
 The C source under `Src/` and `Rsc/` stays untouched as a reference. All
 new code goes under `/Swift/`.
@@ -239,48 +247,60 @@ news, high-score UI, options screen, character creation flow.
 1. Ensure you are on branch `claude/port-game-to-swift-DMVPS`.
 2. `Swift/PLAN.md` is this file. Committing it satisfies 0.A.
 
-**0.B — Install Swift in the container.**
+**0.B — Install Swift in the container.** *(Satisfied 2026-04-18.)*
 
-*Attempted 2026-04-18 in session `session_01K2XHvzPSr73VrSw9HmrMhc` and
-deferred.* The harness network ACL in that session blocked
-`download.swift.org` (403 `host_not_allowed`) and this block was enforced
-above the Bash sandbox (`dangerouslyDisableSandbox: true` did not override
-it). Apt (`swift-lang` not in Ubuntu noble), GitHub releases (swiftly
-ships source-only there), and Docker Hub (no daemon) were also dead ends.
-
-**The user has chosen to resume in a new session with environment
-settings that permit access to `download.swift.org` / `swift.org`** rather
-than write Swift code without a local compiler. Tests must be runnable in
-the container for this project.
-
-Once the new session is attached, run this to satisfy 0.B:
+`download.swift.org` is reachable from the new session, so a direct
+tarball install works. `swiftly init` itself hit a 403 against Apple's
+CDN when fetching release metadata, so we skip `swiftly` and install a
+specific toolchain by hand. We chose 6.0.3-noble because the host is
+Ubuntu 24.04; Swift 5.9 only ships a 22.04 build and would pull mismatched
+`libstdc++`. 6.0.3 compiles `swift-tools-version:5.9` packages without
+issue.
 
 ```bash
-curl -fsSLO https://download.swift.org/swiftly/linux/swiftly-x86_64.tar.gz
-mkdir -p ~/.local/bin
-tar -xzf swiftly-x86_64.tar.gz -C ~/.local/bin
-~/.local/bin/swiftly init --quiet-shell-followup --assume-yes
-. "${SWIFTLY_HOME_DIR:-$HOME/.local/share/swiftly}/env.sh"
-swiftly install 5.9 && swiftly use 5.9
-swift --version        # expect: Swift version 5.9.x
+curl -fsSL -o /tmp/swift.tar.gz \
+  https://download.swift.org/swift-6.0.3-release/ubuntu2404/swift-6.0.3-RELEASE/swift-6.0.3-RELEASE-ubuntu24.04.tar.gz
+sudo mkdir -p /opt/swift
+sudo tar -xzf /tmp/swift.tar.gz -C /opt/swift --strip-components=1
+sudo ln -sf /opt/swift/usr/bin/swift  /usr/local/bin/swift
+sudo ln -sf /opt/swift/usr/bin/swiftc /usr/local/bin/swiftc
+swift --version   # → Swift version 6.0.3 (swift-6.0.3-RELEASE)
 ```
 
-Then tick the 0.B checkbox, append a Progress log entry, and proceed to
-Step 0.C.
+If a future session is on Ubuntu 22.04 and wants the originally-planned
+5.9 toolchain, substitute the URL
+`https://download.swift.org/swift-5.9.2-release/ubuntu2204/swift-5.9.2-RELEASE/swift-5.9.2-RELEASE-ubuntu22.04.tar.gz`.
 
-**0.C — Capture the RNG golden vector.**
-Compile `Src/Math.c` with a tiny `harness.c` (stubs for Palm-only calls as
-needed, `RandSeed(0, 0)`, print first 16 `Rand()` outputs) using `gcc`.
-Save output to `Swift/Tests/SpaceTraderCoreTests/Fixtures/rand_seed_default.txt`.
-The Swift `RNGTests` asserts the same vector. Commit the harness source and
-the fixture together so parity can be re-verified later.
+**0.C — Capture the RNG golden vector.** *(Satisfied 2026-04-18.)*
+The harness lives at
+`Swift/Tests/SpaceTraderCoreTests/Fixtures/rand_harness.c`; it is a
+self-contained copy of `Src/Math.c`'s `Rand` / `RandSeed` bodies with
+`UInt16` / `UInt32` typedef'd to `<stdint.h>` fixed-width types, so no
+Palm SDK is required. Build & run:
+
+```bash
+cd Swift/Tests/SpaceTraderCoreTests/Fixtures
+gcc -std=c99 -O0 -Wall -o rand_harness rand_harness.c
+./rand_harness > rand_seed_default.txt
+```
+
+The fixture captures three seed pairs — `(0,0)` (→ defaults),
+`(1,1)`, and `(12345,54321)` — each producing 16 consecutive `Rand()`
+values. The Swift `RNGTests` parses the file and asserts equality.
+
+Implementation note: because Palm's `UInt16` is 16-bit, `SeedX & MAX_WORD`
+is a no-op and `SeedX >> 16` is always 0, so each step is
+`SeedX = UInt16(18000 * SeedX)` (natural 16-bit overflow). The return
+`(SeedX << 16) + (SeedY & MAX_WORD)` is evaluated in `UInt16`, so the
+left shift drops to 0 and `Rand()` effectively returns `SeedY`. Swift
+must reproduce this exactly, including the truncation.
 
 ## Implementation step checklist
 
 - [x] **Step 0.A** Publish `Swift/PLAN.md` to the branch
-- [ ] **Step 0.B** Install Swift 5.9 via `swiftly` — **deferred to a new session with network allowlist for `download.swift.org`** (see note)
-- [ ] **Step 0.C** Capture RNG golden vector from C
-- [ ] **Step 1**  SwiftPM scaffold (`Package.swift`, empty targets, `swift build` green)
+- [x] **Step 0.B** Install Swift toolchain (6.0.3 direct-tarball on Ubuntu 24.04; `swiftly` unused — Apple CDN 403 on metadata)
+- [x] **Step 0.C** Capture RNG golden vector from C
+- [x] **Step 1**  SwiftPM scaffold (`Package.swift`, empty targets, `swift build` green)
 - [ ] **Step 2**  `Constants.swift` + all `Tables/*.swift` ported from `Src/Global.c`
 - [ ] **Step 3**  `Models/*.swift` ported from `Src/DataTypes.h`
 - [ ] **Step 4**  `Systems/RNG.swift` + `RNGTests` green against fixture
@@ -362,14 +382,20 @@ iOS UI verification (manual, Mac required):
 
 ## Next up
 
-**Step 0.B (retry)** — In a fresh session whose environment allows
-`download.swift.org`, run the `swiftly` install block in the 0.B section
-above, verify `swift --version` reports 5.9.x, tick the checkbox, log
-progress. Then proceed to **Step 0.C** (RNG golden vector via gcc) and
-Step 1 (SwiftPM scaffold).
+**Step 2** — Port `Constants.swift` + the lookup tables in
+`Sources/SpaceTraderCore/Tables/` from `Src/spacetrader.h` and
+`Src/Global.c` (trade items, ship types, politics, status/activity
+labels, police records, reputations, mercenaries, weapons, shields,
+gadgets, system names). Keep everything `static let` on enum types so
+the data is compile-time and can be indexed by the raw enums that Step 3
+will add. No behavior in this step — just data + unit-test sanity checks
+on lengths (e.g. `Tradeitems.count == MAXTRADEITEM`).
 
 ## Progress log
 
 <!-- newest entries at bottom -->
 - [2026-04-18] Step 0.A — Published `Swift/PLAN.md`. `5de109c`. Notes: authoritative plan file committed; branch ready for handoff.
 - [2026-04-18] Step 0.B — **paused**. Harness ACL denies `download.swift.org`; no viable in-container install path (apt, GitHub releases, Docker all dead ends). User will resume in a fresh session whose environment allowlists `download.swift.org` / `swift.org`. No Swift code was written in this session; branch state is the plan file only.
+- [2026-04-18] Step 0.B — Installed Swift 6.0.3 (Ubuntu 24.04 native) directly from `download.swift.org`; `swiftly init` hit an Apple CDN 403 so it was skipped. Notes: `swift --version` → 6.0.3; 5.9 `swift-tools-version` still accepted. Branch switched to `claude/space-trader-swift-port-fHRgv`.
+- [2026-04-18] Step 0.C — Captured RNG golden vector via `rand_harness.c` compiled with gcc; three seed pairs, 16 outputs each, saved to `Tests/SpaceTraderCoreTests/Fixtures/rand_seed_default.txt`. Harness is checked in so parity can be re-verified from C any time.
+- [2026-04-18] Step 1 — SwiftPM scaffold landed: `Swift/Package.swift` with `SpaceTraderCore` library + `SpaceTraderCoreTests` (smoke test passes, fixture copied as a resource). `swift build` + `swift test` both green on Linux. iOS executable target deferred to Step 13.
