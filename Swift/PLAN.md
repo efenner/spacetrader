@@ -311,7 +311,7 @@ must reproduce this exactly, including the truncation.
 - [x] **Step 9**  `Systems/Bank.swift` + `BankTests`
 - [x] **Step 10** `Systems/ShipPrice.swift` + `ShipPriceTests`
 - [x] **Step 11** `Systems/Skill.swift` + `SkillTests`
-- [ ] **Step 12** `Persistence/SaveStore.swift` + `PersistenceTests` (JSON round-trip)
+- [x] **Step 12** `Persistence/SaveStore.swift` + `PersistenceTests` (JSON round-trip)
 - [ ] **Step 13** iOS app target (`iOSApp` executable in `Package.swift`) + `SpaceTraderApp.swift` + `ContentView.swift` tab root
 - [ ] **Step 14** `CommanderStatusView.swift`
 - [ ] **Step 15** `SystemInfoView.swift`
@@ -382,16 +382,16 @@ iOS UI verification (manual, Mac required):
 
 ## Next up
 
-**Step 12** — `Persistence/SaveStore.swift` + `PersistenceTests`.
-JSON round-trip `SaveGame` to `Documents/savegame.json` via
-`FileManager`; keep per-install options (auto-fuel, auto-repair,
-click feedback, etc.) in `UserDefaults` so they outlive a "New
-Game". Tests exercise: empty-directory first-load falls back to a
-fresh default, round-trip through `JSONEncoder` / `JSONDecoder`
-byte-identical (we already have a partial version in
-`ModelsTests.testSaveGameRoundTripIsByteIdentical`; promote it to
-go through the `SaveStore` API), and UserDefaults options survive a
-call to `GameState.reset()`.
+**Step 13** — iOS app target. Add an `iOSApp` executable target to
+`Package.swift` (iOS-only, guarded via `#if os(iOS)` so Linux
+`swift test` stays green), plus `SpaceTraderApp.swift` (`@main`
+entry point injecting a `GameState` as `@StateObject` into a
+`@EnvironmentObject`), and `ContentView.swift` — a `TabView` with
+three tabs (Commander Status, System Info, Buy Cargo) wired to the
+placeholder screens that Steps 14-16 will flesh out. The
+placeholder screens can be one-line `Text("Coming in Step 14")`
+stubs so the compilation and wiring land here and only the visual
+implementation remains.
 
 ## Progress log
 
@@ -411,3 +411,4 @@ call to `GameState.reset()`.
 - [2026-04-21] Step 9 — `Systems/Bank.swift`: `maxLoan`, `getLoan`, `payBack` ported from Bank.c:40-71. MaxLoan tiers by police record (below Clean → 500 cr; at/above → `min(25000, max(1000, (worth/10/500)*500))`), preserving the C double-division rounding-down to the nearest 500. GetLoan/PayBack mirror the C min-min bound expressions exactly, returning the amount actually moved so the UI can echo it. 14 new BankTests (record tiers, clamp floor/ceiling, 500-step rounding, getLoan headroom/amount cap, payBack debt/credits cap, no-debt no-op, three GameState forwarders). 58/58 green. `maxLoan` takes `currentWorth` as a parameter for the same reason Money takes `shipPrice` — Step 10 (ShipPrice) will fold it in.
 - [2026-04-21] Step 10 — `Systems/ShipPrice.swift`: `getHullStrength`, `baseSellPrice`, `currentShipPriceWithoutCargo`, `currentShipPrice`, and `enemyShipPrice` ported from ShipPrice.c:49-112 + the two helpers (Shipyard.c:117-123, Cargo.c:1120-1123). `UPGRADEDHULL` added to Constants as `ShipBalance.upgradedHull = 50`. Preserves the tribbles-quarter-base vs. insurance-full-base split, the base-tank fuel-deduction quirk, and the "gadgets don't count in enemyShipPrice" comment from the C. `enemyShipPrice` takes skill values as parameters so the module has no dependency on the Skill system (Step 11); zero-arg GameState conveniences (`gs.currentWorth()`, `gs.maxLoan()`) will land together with Step 11. 20 new ShipPriceTests (hull upgrade gating, sell-price rounding, fresh vs. damaged vs. tribble Gnat, insurance ignores tribbles, Scarab repair bump, shields/gadgets in the sum, cargo roll-in, skill scaling, zero-skills zeroes enemy price, gadgets-excluded, three GameState forwarders). 78/78 green.
 - [2026-04-21] Step 11 — `Systems/Skill.swift`: `pilotSkill`, `fighterSkill`, `traderSkill`, `engineerSkill` ported from Skill.c:117-350, plus the three equipment predicates (`hasGadget`, `hasShield`, `hasWeapon` — the last preserving the `exactCompare=false` "or better" semantics) and `adaptDifficulty`. Gadget stacks are wired in per skill: Navigating + Cloaking for Pilot (Pilot gets both), Targeting for Fighter, Auto-Repair for Engineer; Trader has no gadget bonus but does get +1 when Jarek has been delivered (`jarekStatus >= 2`). The crew-walk mirrors the C loop exactly — crew[0] seeds, slots 1..<MAXCREW break on -1, so a vacancy in slot 1 masks any filled slot past it. Also landed the zero-arg `gs.currentWorth()`, `gs.maxLoan()`, and `gs.enemyShipPrice(ship:)` conveniences now that Skill is available to fold in. Fuel.swift's private `hasGadget` helper removed in favor of the shared `SkillSystem.hasGadget`. 17 new SkillTests; 95/95 green. Skill functions NthLowest/IncreaseRandom/DecreaseRandom/TonicTweakRandom/RandomSkill/RecalculateBuyPrices/RecalculateSellPrices are deferred to the Encounter/Cargo/SpecialEvent phases.
+- [2026-04-21] Step 12 — `Persistence/SaveStore.swift` + `Persistence/GameOptions.swift`. SaveStore writes the full `SaveGame` as JSON to an injectable URL (defaults to `Documents/savegame.json`); `load()` returns nil when no file exists so the UI can show "first run". GameOptions is a Codable subset of option-flavored SaveGame fields (autoFuel, autoRepair, clicks, 4 ignore-X flags, alwaysInfo, textualEncounters, continuous, reserveMoney, priceDifferences, litterWarning, identifyStartup) with an `init(save:)` + `apply(to:)` bridge. OptionStore stores that blob in UserDefaults under `com.spacetrader.options`. `GameState.resetPreservingOptions()` captures options, resets the save, and re-applies — gives the plan's "options survive a New Game" rule without reshaping SaveGame. 11 new PersistenceTests (load-empty, round-trip via JSON encode-equality with sorted keys since SaveGame isn't Equatable, atomic overwrite, delete, nested directory creation, option extract/apply, UserDefaults round-trip with per-test suite names, empty-defaults nil, clear, resetPreservingOptions). 106/106 green.
