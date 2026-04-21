@@ -17,7 +17,7 @@ public enum FuelSystem {
     /// Capacity the ship can hold in parsecs. Fuel Compactor fixes it
     /// to 18 independent of ship type (Fuel.c:50-53).
     public static func getFuelTanks(ship: Ship) -> Int {
-        if hasGadget(ship, GadgetIndex.fuelCompactor) {
+        if SkillSystem.hasGadget(ship: ship, gadget: GadgetIndex.fuelCompactor) {
             return 18
         }
         return ShipTypes.all[ship.type].fuelTanks
@@ -52,12 +52,6 @@ public enum FuelSystem {
         return parsecs * costPerTank
     }
 
-    /// Port of `HasGadget` used by getFuelTanks. The full HasGadget
-    /// helper will move to a shared file once more systems need it;
-    /// scoping it here avoids prematurely expanding the surface area.
-    @usableFromInline internal static func hasGadget(_ ship: Ship, _ gadget: Int) -> Bool {
-        ship.gadget.contains(gadget)
-    }
 }
 
 public extension GameState {
