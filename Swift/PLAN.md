@@ -309,7 +309,7 @@ must reproduce this exactly, including the truncation.
 - [x] **Step 7**  `Systems/Money.swift` + `MoneyTests`
 - [x] **Step 8**  `Systems/Fuel.swift` + `FuelTests`
 - [x] **Step 9**  `Systems/Bank.swift` + `BankTests`
-- [ ] **Step 10** `Systems/ShipPrice.swift` + `ShipPriceTests`
+- [x] **Step 10** `Systems/ShipPrice.swift` + `ShipPriceTests`
 - [ ] **Step 11** `Systems/Skill.swift` + `SkillTests`
 - [ ] **Step 12** `Persistence/SaveStore.swift` + `PersistenceTests` (JSON round-trip)
 - [ ] **Step 13** iOS app target (`iOSApp` executable in `Package.swift`) + `SpaceTraderApp.swift` + `ContentView.swift` tab root
@@ -382,15 +382,18 @@ iOS UI verification (manual, Mac required):
 
 ## Next up
 
-**Step 10** — `Systems/ShipPrice.swift` + `ShipPriceTests`. Port
-`CurrentShipPrice`, `EnemyShipPrice`, `BasePrice`, and
-`CurrentShipPriceWithoutCargo` from `Src/ShipPrice.c`. The core
-formula is 75% of the ship type's base price plus adjustments for
-tribbles, each piece of equipment at its discounted resale, and crew
-skill (Src/ShipPrice.c:48-94). Once this lands, the Money and Bank
-forwarders that currently demand a `currentWorth` / `shipPrice`
-argument can get a zero-arg convenience (`gs.currentWorth()`,
-`gs.maxLoan()`) that folds in the current ship's resale price.
+**Step 11** — `Systems/Skill.swift` + `SkillTests`. Port the four
+skill aggregators from `Src/Skill.c`: `PilotSkill`,
+`FighterSkill`, `TraderSkill`, and `EngineerSkill`. Each one is the
+**max** over the current crew (Mercenary[] entries indexed by
+Ship.Crew[]) of the relevant skill, with `SkillBonus` (+3) added when
+the ship has the corresponding gadget — Navigating System, Targeting
+System, Auto-Repair, and Cloaking Device do NOT boost skills in the
+C code; only the four "Increase X Skill" equipment are defined. Once
+this lands, add the zero-arg GameState conveniences:
+`gs.currentWorth()` (Money) and `gs.maxLoan()` (Bank) that fold in
+`ShipPrice.currentShipPrice`, plus `gs.enemyShipPrice(ship:)` that
+fills in crew-skill values for the provided opponent.
 
 ## Progress log
 
@@ -408,3 +411,4 @@ argument can get a zero-arg convenience (`gs.currentWorth()`,
 - [2026-04-18] Step 7 — `Systems/Money.swift`: `currentWorth` mirrors Money.c:46-49 exactly (including the MoonBought + COSTMOON branch) and takes `shipPrice` as a parameter so Money has no hidden dependency on ShipPrice (Step 10). `payInterest` is faithful to Money.c:55-70 including the subtle strict `>` comparison on credits vs. incDebt. 11 new MoneyTests covering currentWorth permutations, zero-debt no-op, minimum-interest-of-1 clamp, equal-credits-vs-interest else branch, broke commander rolling into debt, partial drain, and two GameState forwarders. Fixed one test bug in review (asserted 11_000 where C gives 10_000 at the boundary). 36/36 green.
 - [2026-04-21] Step 8 — `Systems/Fuel.swift`: `getFuelTanks`, `getFuel`, `buyFuel` ported from Fuel.c:50-83. Fuel Compactor gadget pins capacity at 18; `getFuel` clamps against current capacity so a dropped compactor can't leave a ship reading above its tank. `buyFuel` preserves the C integer-division behavior (9 cr at 5 cr/parsec buys 1 parsec, loses 4 cr). 8 new FuelTests (default capacity, compactor bump, clamp, credit-limit, amount=0 no-op, compactor fill, GameState forwarder). 44/44 green. GameState forwarder uses the local-copy pattern to sidestep overlapping exclusive access on the `@Published save`, same as payInterest.
 - [2026-04-21] Step 9 — `Systems/Bank.swift`: `maxLoan`, `getLoan`, `payBack` ported from Bank.c:40-71. MaxLoan tiers by police record (below Clean → 500 cr; at/above → `min(25000, max(1000, (worth/10/500)*500))`), preserving the C double-division rounding-down to the nearest 500. GetLoan/PayBack mirror the C min-min bound expressions exactly, returning the amount actually moved so the UI can echo it. 14 new BankTests (record tiers, clamp floor/ceiling, 500-step rounding, getLoan headroom/amount cap, payBack debt/credits cap, no-debt no-op, three GameState forwarders). 58/58 green. `maxLoan` takes `currentWorth` as a parameter for the same reason Money takes `shipPrice` — Step 10 (ShipPrice) will fold it in.
+- [2026-04-21] Step 10 — `Systems/ShipPrice.swift`: `getHullStrength`, `baseSellPrice`, `currentShipPriceWithoutCargo`, `currentShipPrice`, and `enemyShipPrice` ported from ShipPrice.c:49-112 + the two helpers (Shipyard.c:117-123, Cargo.c:1120-1123). `UPGRADEDHULL` added to Constants as `ShipBalance.upgradedHull = 50`. Preserves the tribbles-quarter-base vs. insurance-full-base split, the base-tank fuel-deduction quirk, and the "gadgets don't count in enemyShipPrice" comment from the C. `enemyShipPrice` takes skill values as parameters so the module has no dependency on the Skill system (Step 11); zero-arg GameState conveniences (`gs.currentWorth()`, `gs.maxLoan()`) will land together with Step 11. 20 new ShipPriceTests (hull upgrade gating, sell-price rounding, fresh vs. damaged vs. tribble Gnat, insurance ignores tribbles, Scarab repair bump, shields/gadgets in the sum, cargo roll-in, skill scaling, zero-skills zeroes enemy price, gadgets-excluded, three GameState forwarders). 78/78 green.

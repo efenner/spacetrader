@@ -192,6 +192,13 @@ public enum Money {
     public static let maxQtyDigits     = 3
 }
 
+/// Ship-hull balance constants. `upgradedHull` mirrors `UPGRADEDHULL`
+/// from `Src/spacetrader.h:136` — the 50-hull bonus granted by the
+/// Scarab quest (awarded when `scarabStatus == 3`).
+public enum ShipBalance {
+    public static let upgradedHull = 50
+}
+
 public enum Highscore {
     public static let killed = 0
     public static let retired = 1
