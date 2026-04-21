@@ -307,7 +307,7 @@ must reproduce this exactly, including the truncation.
 - [x] **Step 5**  `Systems/Distance.swift` + `DistanceTests` *(completed 2026-04-18, same rationale as Step 4)*
 - [x] **Step 6**  `GameState.swift` skeleton (properties only)
 - [x] **Step 7**  `Systems/Money.swift` + `MoneyTests`
-- [ ] **Step 8**  `Systems/Fuel.swift` + `FuelTests`
+- [x] **Step 8**  `Systems/Fuel.swift` + `FuelTests`
 - [ ] **Step 9**  `Systems/Bank.swift` + `BankTests`
 - [ ] **Step 10** `Systems/ShipPrice.swift` + `ShipPriceTests`
 - [ ] **Step 11** `Systems/Skill.swift` + `SkillTests`
@@ -382,12 +382,16 @@ iOS UI verification (manual, Mac required):
 
 ## Next up
 
-**Step 8** — `Systems/Fuel.swift` + `FuelTests`. Port `getFuelTanks`,
-`getFuel`, and `buyFuel` from `Src/Fuel.c`. Key rule: tank capacity is
-normally the ship type's `FuelTanks`, but if the commander has the
-`FUELCOMPACTOR` gadget (index 5 from Constants.swift) the cap jumps to
-18 (see `Src/Fuel.c:50-53`). `buyFuel` needs to clamp to both credits
-and remaining capacity.
+**Step 9** — `Systems/Bank.swift` + `BankTests`. Port `MaxLoan`,
+`GetLoan`, and `PayBack` from `Src/Bank.c:40-71`. `MaxLoan` tiers by
+police record: below `CLEANSCORE` → 500 cr; at/above →
+`min(25000, max(1000, (currentWorth/10/500)*500))`. `GetLoan` is
+bounded by `MaxLoan() − Debt`; `PayBack` by `min(Debt, Cash, Credits)`.
+Because `MaxLoan` reaches through `CurrentWorth()` (which needs
+`CurrentShipPrice()` — Step 10), the Bank module takes `currentWorth`
+as a parameter for now, mirroring the shape Money settled on. GameState
+forwarders copy fields to locals before calling to avoid overlapping
+exclusive-access on the `@Published save` (same refactor Money needed).
 
 ## Progress log
 
@@ -403,3 +407,4 @@ and remaining capacity.
 - [2026-04-18] Step 3 — `Models/Ship.swift`, `CrewMember.swift`, `SolarSystem.swift`, `SpecialEvent.swift`, `HighScore.swift`, `SaveGame.swift` (C's SAVEGAMETYPE minus Palm-only fields). All conform to Codable + Sendable + Hashable. `SaveGame()` builds a 32-slot mercenary roster and a 120-slot galaxy using the index-matched default constructors. 7 new `ModelsTests` including a JSON-round-trip on a populated SaveGame that asserts byte-identical re-encode; 25/25 green overall.
 - [2026-04-18] Step 6 — `GameState.swift` ObservableObject wrapping a `SaveGame`, plus forwarding accessors (`credits`, `debt`, `ship`, `commander`, `currentSystem`, `moonBought`) and a `reset()` that installs defaults. Combine guarded behind `#if canImport(Combine)` so Linux `swift test` still compiles; on iOS the published property drives UI.
 - [2026-04-18] Step 7 — `Systems/Money.swift`: `currentWorth` mirrors Money.c:46-49 exactly (including the MoonBought + COSTMOON branch) and takes `shipPrice` as a parameter so Money has no hidden dependency on ShipPrice (Step 10). `payInterest` is faithful to Money.c:55-70 including the subtle strict `>` comparison on credits vs. incDebt. 11 new MoneyTests covering currentWorth permutations, zero-debt no-op, minimum-interest-of-1 clamp, equal-credits-vs-interest else branch, broke commander rolling into debt, partial drain, and two GameState forwarders. Fixed one test bug in review (asserted 11_000 where C gives 10_000 at the boundary). 36/36 green.
+- [2026-04-21] Step 8 — `Systems/Fuel.swift`: `getFuelTanks`, `getFuel`, `buyFuel` ported from Fuel.c:50-83. Fuel Compactor gadget pins capacity at 18; `getFuel` clamps against current capacity so a dropped compactor can't leave a ship reading above its tank. `buyFuel` preserves the C integer-division behavior (9 cr at 5 cr/parsec buys 1 parsec, loses 4 cr). 8 new FuelTests (default capacity, compactor bump, clamp, credit-limit, amount=0 no-op, compactor fill, GameState forwarder). 44/44 green. GameState forwarder uses the local-copy pattern to sidestep overlapping exclusive access on the `@Published save`, same as payInterest.
