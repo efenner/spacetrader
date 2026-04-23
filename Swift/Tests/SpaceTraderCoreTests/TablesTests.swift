@@ -86,4 +86,27 @@ final class TablesTests: XCTestCase {
         XCTAssertEqual(MercenaryNames.all[0], MercenaryNames.defaultCommanderName)
         XCTAssertEqual(MercenaryNames.all.last, "Zeethibal")
     }
+
+    // MARK: Tier lookups used by CommanderStatusView
+
+    func testPoliceRecordTierForClean() {
+        XCTAssertEqual(PoliceRecords.tier(for: 0).name, "Clean")
+    }
+
+    func testPoliceRecordTierForHero() {
+        XCTAssertEqual(PoliceRecords.tier(for: 100).name, "Hero")
+    }
+
+    func testPoliceRecordTierFloorsAtPsycho() {
+        // Arbitrarily-negative score still returns the worst tier.
+        XCTAssertEqual(PoliceRecords.tier(for: -9_999).name, "Psycho")
+    }
+
+    func testReputationTierForAverage() {
+        XCTAssertEqual(Reputations.tier(for: ReputationScore.average).name, "Average")
+    }
+
+    func testReputationTierForElite() {
+        XCTAssertEqual(Reputations.tier(for: 10_000).name, "Elite")
+    }
 }

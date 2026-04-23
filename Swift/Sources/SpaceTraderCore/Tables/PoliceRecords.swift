@@ -43,3 +43,28 @@ public enum Reputations {
         ReputationTier(name: "Elite",           minScore: ReputationScore.elite),
     ]
 }
+
+public extension PoliceRecords {
+    /// Name of the tier the commander currently sits in. Mirrors the
+    /// while-loop walk in `CmdrStatusEvent.c:77-82`: find the highest
+    /// tier whose `minScore` doesn't exceed `score`, with a defensive
+    /// floor at the first tier for very-negative scores.
+    static func tier(for score: Int) -> PoliceRecord {
+        var i = 0
+        while i < all.count && score >= all[i].minScore { i += 1 }
+        i -= 1
+        if i < 0 { i = 0 }
+        return all[i]
+    }
+}
+
+public extension Reputations {
+    /// Reputation tier name. Same walk pattern as `PoliceRecords.tier`.
+    static func tier(for score: Int) -> ReputationTier {
+        var i = 0
+        while i < all.count && score >= all[i].minScore { i += 1 }
+        i -= 1
+        if i < 0 { i = 0 }
+        return all[i]
+    }
+}
