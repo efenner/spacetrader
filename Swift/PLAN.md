@@ -316,7 +316,7 @@ must reproduce this exactly, including the truncation.
 - [x] **Step 14** `CommanderStatusView.swift`
 - [x] **Step 15** `SystemInfoView.swift`
 - [x] **Step 16** `BuyCargoView.swift`
-- [ ] **Step 17** README with Mac/Xcode run instructions; final push
+- [x] **Step 17** README with Mac/Xcode run instructions; final push
 
 ## Verification
 
@@ -382,13 +382,11 @@ iOS UI verification (manual, Mac required):
 
 ## Next up
 
-**Step 17** — Phase-1 wrap-up. Write `Swift/README.md` (or refresh
-the one that exists) with: what builds where (Linux `swift test`
-vs. Mac `swift build` vs. Xcode iPhone sim), the plan's scope note
-("foundation + core systems + three screens; encounter/travel/
-quests follow in Phase 2+"), a pointer at `PLAN.md`, and the
-GPLv2 attribution. Tick Step 17, append a final Progress log
-entry, and push. Phase 1 is then complete.
+**Phase 1 is complete.** All 17 checklist items are ticked; 125
+tests pass on Linux; the iOS app builds and runs in Xcode on Mac
+(UI verification manual). Subsequent sessions should start
+**Phase 2 (Travel & galactic chart)** per the "Follow-up phases"
+section below, or one of the later phases if the user redirects.
 
 ## Progress log
 
@@ -413,3 +411,4 @@ entry, and push. Phase 1 is then complete.
 - [2026-04-21] Step 14 — `CommanderStatusView.swift` full layout. Sectioned Form with Skills ("base [adapted]" matching `DisplaySkill` in CmdrStatusEvent.c:43-51), Standing (total kills, police record tier, reputation tier, difficulty), and Finances (days, credits, debt, net worth via `gs.currentWorth()`). `NavigationStack` titles with the commander name. Added `PoliceRecords.tier(for:)` and `Reputations.tier(for:)` helpers to SpaceTraderCore, mirroring the C while-loop walk exactly (defensive floor at first tier for very-negative scores). New `StatRow` component in `iOSApp/Components/` aligns label/value pairs. 5 new tier-lookup tests; 111/111 green. UI verification still deferred to Mac/Xcode.
 - [2026-04-21] Step 15 — `SystemInfoView.swift`. Port of the read-only half of `SystemInfoEvent.c:253-323`: sectioned Form with Overview (tech level, government, size, resources, status, police activity, pirate activity — the first two joined up via `PoliticsTable` / `ActivityLabels`) and Market (ten rows showing each trade item at `gs.save.buyPrice[i]`, with `—` for zeros since `BuyPrice==0` means "not sold here" per `Src/Skill.c:142-164`). Navigation title tracks the current system name. Special events / personnel roster / newspaper buttons are deferred — they belong to flows Phase 1 doesn't cover. 111/111 tests still green.
 - [2026-04-21] Step 16 — `Systems/Cargo.swift` + `BuyCargoView.swift` + `PriceRow.swift`. CargoSystem ports `totalCargoBays`, `filledCargoBays`, `buyCargo` (with the four C refusal guards from Cargo.c:862-884), and the SELLCARGO branch of `sellCargo` — including the subtle cost-basis proration at Cargo.c:944. Quest-driven cargo-bay modifiers (JaporiDiseaseStatus, ReactorStatus, LeaveEmpty) are deferred. GameState forwarders mutate `ship.cargo`, `credits`, `buyingPrice`, and the current system's `qty` as a bundle so callers can't forget one. BuyCargoView lists the ten trade items with unit price, market qty, hold qty, and Buy/Sell-1 steppers; refusal paths surface as disabled buttons instead of alerts. New `PriceRow` component handles row layout. 14 new CargoTests covering the four refusal paths, the three-cap amount clamping, sell-side proration, and two GameState forwarders. 125/125 green.
+- [2026-04-21] Step 17 — `Swift/README.md` landed. Covers: repo layout (Sources/SpaceTraderCore, Sources/iOSApp, Tests), Linux build/test instructions (Swift 6.0.3 direct tarball, `swift build`, `swift test` → 125 green), Mac/Xcode run instructions (open Package.swift, pick iOSApp scheme, iPhone 15 sim, what each of the three tabs shows), RNG golden vector regeneration via the checked-in `rand_harness.c`, and the GPLv2 attribution. **Phase 1 complete** — all 17 checklist items ticked. Phase 2 (Traveler.c + galactic chart) is the natural next push per the Follow-up phases section.
