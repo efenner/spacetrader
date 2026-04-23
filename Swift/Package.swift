@@ -5,10 +5,28 @@
 //
 // `SpaceTraderCore` is Foundation-only so it builds on Linux for CI
 // (`swift test`) and on macOS/iOS for the app. The `iOSApp` executable
-// target is platform-guarded — on Linux it resolves to an empty source
-// list and compiles to nothing, so the whole package still builds green.
+// target only exists when the package is configured on a macOS host —
+// `swift package` evaluates this file on the current host, and Linux
+// doesn't have SwiftUI / UIKit / the iOS SDK, so its target list stays
+// empty.
 
 import PackageDescription
+
+#if os(macOS)
+let iosAppTargets: [Target] = [
+    .executableTarget(
+        name: "iOSApp",
+        dependencies: ["SpaceTraderCore"],
+        path: "Sources/iOSApp"
+    ),
+]
+let iosAppProducts: [Product] = [
+    .executable(name: "iOSApp", targets: ["iOSApp"]),
+]
+#else
+let iosAppTargets: [Target] = []
+let iosAppProducts: [Product] = []
+#endif
 
 let package = Package(
     name: "SpaceTrader",
@@ -18,7 +36,7 @@ let package = Package(
     ],
     products: [
         .library(name: "SpaceTraderCore", targets: ["SpaceTraderCore"]),
-    ],
+    ] + iosAppProducts,
     targets: [
         .target(
             name: "SpaceTraderCore",
@@ -36,5 +54,5 @@ let package = Package(
                 .copy("Fixtures/rand_seed_default.txt"),
             ]
         ),
-    ]
+    ] + iosAppTargets
 )

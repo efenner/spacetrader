@@ -312,7 +312,7 @@ must reproduce this exactly, including the truncation.
 - [x] **Step 10** `Systems/ShipPrice.swift` + `ShipPriceTests`
 - [x] **Step 11** `Systems/Skill.swift` + `SkillTests`
 - [x] **Step 12** `Persistence/SaveStore.swift` + `PersistenceTests` (JSON round-trip)
-- [ ] **Step 13** iOS app target (`iOSApp` executable in `Package.swift`) + `SpaceTraderApp.swift` + `ContentView.swift` tab root
+- [x] **Step 13** iOS app target (`iOSApp` executable in `Package.swift`) + `SpaceTraderApp.swift` + `ContentView.swift` tab root
 - [ ] **Step 14** `CommanderStatusView.swift`
 - [ ] **Step 15** `SystemInfoView.swift`
 - [ ] **Step 16** `BuyCargoView.swift`
@@ -382,16 +382,13 @@ iOS UI verification (manual, Mac required):
 
 ## Next up
 
-**Step 13** — iOS app target. Add an `iOSApp` executable target to
-`Package.swift` (iOS-only, guarded via `#if os(iOS)` so Linux
-`swift test` stays green), plus `SpaceTraderApp.swift` (`@main`
-entry point injecting a `GameState` as `@StateObject` into a
-`@EnvironmentObject`), and `ContentView.swift` — a `TabView` with
-three tabs (Commander Status, System Info, Buy Cargo) wired to the
-placeholder screens that Steps 14-16 will flesh out. The
-placeholder screens can be one-line `Text("Coming in Step 14")`
-stubs so the compilation and wiring land here and only the visual
-implementation remains.
+**Step 14** — `CommanderStatusView.swift`. Port
+`Src/CmdrStatusEvent.c`: show commander name, days played, credits,
+debt, current system, ship type, cargo-bay usage, fuel, hull, and
+the four effective skills (via `gs.pilotSkill()` etc.). Use the
+`GameState` environment object already wired in Step 13 so the view
+updates when `save` mutates. A small `StatRow` component in
+`iOSApp/Components/` keeps the rows aligned.
 
 ## Progress log
 
@@ -412,3 +409,4 @@ implementation remains.
 - [2026-04-21] Step 10 — `Systems/ShipPrice.swift`: `getHullStrength`, `baseSellPrice`, `currentShipPriceWithoutCargo`, `currentShipPrice`, and `enemyShipPrice` ported from ShipPrice.c:49-112 + the two helpers (Shipyard.c:117-123, Cargo.c:1120-1123). `UPGRADEDHULL` added to Constants as `ShipBalance.upgradedHull = 50`. Preserves the tribbles-quarter-base vs. insurance-full-base split, the base-tank fuel-deduction quirk, and the "gadgets don't count in enemyShipPrice" comment from the C. `enemyShipPrice` takes skill values as parameters so the module has no dependency on the Skill system (Step 11); zero-arg GameState conveniences (`gs.currentWorth()`, `gs.maxLoan()`) will land together with Step 11. 20 new ShipPriceTests (hull upgrade gating, sell-price rounding, fresh vs. damaged vs. tribble Gnat, insurance ignores tribbles, Scarab repair bump, shields/gadgets in the sum, cargo roll-in, skill scaling, zero-skills zeroes enemy price, gadgets-excluded, three GameState forwarders). 78/78 green.
 - [2026-04-21] Step 11 — `Systems/Skill.swift`: `pilotSkill`, `fighterSkill`, `traderSkill`, `engineerSkill` ported from Skill.c:117-350, plus the three equipment predicates (`hasGadget`, `hasShield`, `hasWeapon` — the last preserving the `exactCompare=false` "or better" semantics) and `adaptDifficulty`. Gadget stacks are wired in per skill: Navigating + Cloaking for Pilot (Pilot gets both), Targeting for Fighter, Auto-Repair for Engineer; Trader has no gadget bonus but does get +1 when Jarek has been delivered (`jarekStatus >= 2`). The crew-walk mirrors the C loop exactly — crew[0] seeds, slots 1..<MAXCREW break on -1, so a vacancy in slot 1 masks any filled slot past it. Also landed the zero-arg `gs.currentWorth()`, `gs.maxLoan()`, and `gs.enemyShipPrice(ship:)` conveniences now that Skill is available to fold in. Fuel.swift's private `hasGadget` helper removed in favor of the shared `SkillSystem.hasGadget`. 17 new SkillTests; 95/95 green. Skill functions NthLowest/IncreaseRandom/DecreaseRandom/TonicTweakRandom/RandomSkill/RecalculateBuyPrices/RecalculateSellPrices are deferred to the Encounter/Cargo/SpecialEvent phases.
 - [2026-04-21] Step 12 — `Persistence/SaveStore.swift` + `Persistence/GameOptions.swift`. SaveStore writes the full `SaveGame` as JSON to an injectable URL (defaults to `Documents/savegame.json`); `load()` returns nil when no file exists so the UI can show "first run". GameOptions is a Codable subset of option-flavored SaveGame fields (autoFuel, autoRepair, clicks, 4 ignore-X flags, alwaysInfo, textualEncounters, continuous, reserveMoney, priceDifferences, litterWarning, identifyStartup) with an `init(save:)` + `apply(to:)` bridge. OptionStore stores that blob in UserDefaults under `com.spacetrader.options`. `GameState.resetPreservingOptions()` captures options, resets the save, and re-applies — gives the plan's "options survive a New Game" rule without reshaping SaveGame. 11 new PersistenceTests (load-empty, round-trip via JSON encode-equality with sorted keys since SaveGame isn't Equatable, atomic overwrite, delete, nested directory creation, option extract/apply, UserDefaults round-trip with per-test suite names, empty-defaults nil, clear, resetPreservingOptions). 106/106 green.
+- [2026-04-21] Step 13 — iOS app target. `Package.swift` now declares an `iOSApp` executable + `.executable` product, both wrapped in `#if os(macOS)` so Linux `swift build` + `swift test` still run clean (the target list evaluates empty on non-Mac hosts, no SwiftUI/UIKit dependency leaks onto Linux). `SpaceTraderApp.swift` is `@main`, loads `SaveStore.default` on launch (nil → fresh `GameState`), reads `OptionStore.load()` to rehydrate user prefs, and injects the `GameState` as a `@StateObject` / `EnvironmentObject`. `ContentView.swift` is a three-tab `TabView` (Status, System, Trade) with SF Symbol icons. Placeholder screens for Steps 14-16 live under `Sources/iOSApp/Screens/` — each is a one-line "coming in Step N" Text() stub that references `@EnvironmentObject` GameState so the wiring is already live. 106/106 tests still green on Linux. UI verification deferred to Mac/Xcode per the plan.
