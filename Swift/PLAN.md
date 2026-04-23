@@ -315,7 +315,7 @@ must reproduce this exactly, including the truncation.
 - [x] **Step 13** iOS app target (`iOSApp` executable in `Package.swift`) + `SpaceTraderApp.swift` + `ContentView.swift` tab root
 - [x] **Step 14** `CommanderStatusView.swift`
 - [x] **Step 15** `SystemInfoView.swift`
-- [ ] **Step 16** `BuyCargoView.swift`
+- [x] **Step 16** `BuyCargoView.swift`
 - [ ] **Step 17** README with Mac/Xcode run instructions; final push
 
 ## Verification
@@ -382,14 +382,13 @@ iOS UI verification (manual, Mac required):
 
 ## Next up
 
-**Step 16** — `BuyCargoView.swift`. Buy-side subset of
-`Src/Cargo.c`: list the ten trade items with their buy prices,
-available quantity in the system, and quantity already in the hold,
-plus Buy / Sell+1 buttons that mutate `Credits` and
-`Ship.Cargo[i]`. For Phase 1 we can skip the full
-`NoAfford`/`NotEnoughSpace`/`BuyCancel` alert choreography and just
-disable the Buy button when either constraint fails. A `PriceRow`
-component under `iOSApp/Components/` keeps rows aligned.
+**Step 17** — Phase-1 wrap-up. Write `Swift/README.md` (or refresh
+the one that exists) with: what builds where (Linux `swift test`
+vs. Mac `swift build` vs. Xcode iPhone sim), the plan's scope note
+("foundation + core systems + three screens; encounter/travel/
+quests follow in Phase 2+"), a pointer at `PLAN.md`, and the
+GPLv2 attribution. Tick Step 17, append a final Progress log
+entry, and push. Phase 1 is then complete.
 
 ## Progress log
 
@@ -413,3 +412,4 @@ component under `iOSApp/Components/` keeps rows aligned.
 - [2026-04-21] Step 13 — iOS app target. `Package.swift` now declares an `iOSApp` executable + `.executable` product, both wrapped in `#if os(macOS)` so Linux `swift build` + `swift test` still run clean (the target list evaluates empty on non-Mac hosts, no SwiftUI/UIKit dependency leaks onto Linux). `SpaceTraderApp.swift` is `@main`, loads `SaveStore.default` on launch (nil → fresh `GameState`), reads `OptionStore.load()` to rehydrate user prefs, and injects the `GameState` as a `@StateObject` / `EnvironmentObject`. `ContentView.swift` is a three-tab `TabView` (Status, System, Trade) with SF Symbol icons. Placeholder screens for Steps 14-16 live under `Sources/iOSApp/Screens/` — each is a one-line "coming in Step N" Text() stub that references `@EnvironmentObject` GameState so the wiring is already live. 106/106 tests still green on Linux. UI verification deferred to Mac/Xcode per the plan.
 - [2026-04-21] Step 14 — `CommanderStatusView.swift` full layout. Sectioned Form with Skills ("base [adapted]" matching `DisplaySkill` in CmdrStatusEvent.c:43-51), Standing (total kills, police record tier, reputation tier, difficulty), and Finances (days, credits, debt, net worth via `gs.currentWorth()`). `NavigationStack` titles with the commander name. Added `PoliceRecords.tier(for:)` and `Reputations.tier(for:)` helpers to SpaceTraderCore, mirroring the C while-loop walk exactly (defensive floor at first tier for very-negative scores). New `StatRow` component in `iOSApp/Components/` aligns label/value pairs. 5 new tier-lookup tests; 111/111 green. UI verification still deferred to Mac/Xcode.
 - [2026-04-21] Step 15 — `SystemInfoView.swift`. Port of the read-only half of `SystemInfoEvent.c:253-323`: sectioned Form with Overview (tech level, government, size, resources, status, police activity, pirate activity — the first two joined up via `PoliticsTable` / `ActivityLabels`) and Market (ten rows showing each trade item at `gs.save.buyPrice[i]`, with `—` for zeros since `BuyPrice==0` means "not sold here" per `Src/Skill.c:142-164`). Navigation title tracks the current system name. Special events / personnel roster / newspaper buttons are deferred — they belong to flows Phase 1 doesn't cover. 111/111 tests still green.
+- [2026-04-21] Step 16 — `Systems/Cargo.swift` + `BuyCargoView.swift` + `PriceRow.swift`. CargoSystem ports `totalCargoBays`, `filledCargoBays`, `buyCargo` (with the four C refusal guards from Cargo.c:862-884), and the SELLCARGO branch of `sellCargo` — including the subtle cost-basis proration at Cargo.c:944. Quest-driven cargo-bay modifiers (JaporiDiseaseStatus, ReactorStatus, LeaveEmpty) are deferred. GameState forwarders mutate `ship.cargo`, `credits`, `buyingPrice`, and the current system's `qty` as a bundle so callers can't forget one. BuyCargoView lists the ten trade items with unit price, market qty, hold qty, and Buy/Sell-1 steppers; refusal paths surface as disabled buttons instead of alerts. New `PriceRow` component handles row layout. 14 new CargoTests covering the four refusal paths, the three-cap amount clamping, sell-side proration, and two GameState forwarders. 125/125 green.
