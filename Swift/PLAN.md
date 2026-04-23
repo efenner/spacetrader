@@ -314,7 +314,7 @@ must reproduce this exactly, including the truncation.
 - [x] **Step 12** `Persistence/SaveStore.swift` + `PersistenceTests` (JSON round-trip)
 - [x] **Step 13** iOS app target (`iOSApp` executable in `Package.swift`) + `SpaceTraderApp.swift` + `ContentView.swift` tab root
 - [x] **Step 14** `CommanderStatusView.swift`
-- [ ] **Step 15** `SystemInfoView.swift`
+- [x] **Step 15** `SystemInfoView.swift`
 - [ ] **Step 16** `BuyCargoView.swift`
 - [ ] **Step 17** README with Mac/Xcode run instructions; final push
 
@@ -382,14 +382,14 @@ iOS UI verification (manual, Mac required):
 
 ## Next up
 
-**Step 15** — `SystemInfoView.swift`. Port
-`Src/SystemInfoEvent.c` — the docked-screen readout for the
-currently-visited system. Show: name, tech level label, government
-name (from `PoliticsTable`), system status label, special resource
-label, system size, and the ten trade items with their `buyPrice`
-snapshot. Prices can come straight from `gs.save.buyPrice[i]` (the
-field is already populated in `SaveGame`; the full
-`RecalculateBuyPrices` pipeline ports later). Reuse `StatRow`.
+**Step 16** — `BuyCargoView.swift`. Buy-side subset of
+`Src/Cargo.c`: list the ten trade items with their buy prices,
+available quantity in the system, and quantity already in the hold,
+plus Buy / Sell+1 buttons that mutate `Credits` and
+`Ship.Cargo[i]`. For Phase 1 we can skip the full
+`NoAfford`/`NotEnoughSpace`/`BuyCancel` alert choreography and just
+disable the Buy button when either constraint fails. A `PriceRow`
+component under `iOSApp/Components/` keeps rows aligned.
 
 ## Progress log
 
@@ -412,3 +412,4 @@ field is already populated in `SaveGame`; the full
 - [2026-04-21] Step 12 — `Persistence/SaveStore.swift` + `Persistence/GameOptions.swift`. SaveStore writes the full `SaveGame` as JSON to an injectable URL (defaults to `Documents/savegame.json`); `load()` returns nil when no file exists so the UI can show "first run". GameOptions is a Codable subset of option-flavored SaveGame fields (autoFuel, autoRepair, clicks, 4 ignore-X flags, alwaysInfo, textualEncounters, continuous, reserveMoney, priceDifferences, litterWarning, identifyStartup) with an `init(save:)` + `apply(to:)` bridge. OptionStore stores that blob in UserDefaults under `com.spacetrader.options`. `GameState.resetPreservingOptions()` captures options, resets the save, and re-applies — gives the plan's "options survive a New Game" rule without reshaping SaveGame. 11 new PersistenceTests (load-empty, round-trip via JSON encode-equality with sorted keys since SaveGame isn't Equatable, atomic overwrite, delete, nested directory creation, option extract/apply, UserDefaults round-trip with per-test suite names, empty-defaults nil, clear, resetPreservingOptions). 106/106 green.
 - [2026-04-21] Step 13 — iOS app target. `Package.swift` now declares an `iOSApp` executable + `.executable` product, both wrapped in `#if os(macOS)` so Linux `swift build` + `swift test` still run clean (the target list evaluates empty on non-Mac hosts, no SwiftUI/UIKit dependency leaks onto Linux). `SpaceTraderApp.swift` is `@main`, loads `SaveStore.default` on launch (nil → fresh `GameState`), reads `OptionStore.load()` to rehydrate user prefs, and injects the `GameState` as a `@StateObject` / `EnvironmentObject`. `ContentView.swift` is a three-tab `TabView` (Status, System, Trade) with SF Symbol icons. Placeholder screens for Steps 14-16 live under `Sources/iOSApp/Screens/` — each is a one-line "coming in Step N" Text() stub that references `@EnvironmentObject` GameState so the wiring is already live. 106/106 tests still green on Linux. UI verification deferred to Mac/Xcode per the plan.
 - [2026-04-21] Step 14 — `CommanderStatusView.swift` full layout. Sectioned Form with Skills ("base [adapted]" matching `DisplaySkill` in CmdrStatusEvent.c:43-51), Standing (total kills, police record tier, reputation tier, difficulty), and Finances (days, credits, debt, net worth via `gs.currentWorth()`). `NavigationStack` titles with the commander name. Added `PoliceRecords.tier(for:)` and `Reputations.tier(for:)` helpers to SpaceTraderCore, mirroring the C while-loop walk exactly (defensive floor at first tier for very-negative scores). New `StatRow` component in `iOSApp/Components/` aligns label/value pairs. 5 new tier-lookup tests; 111/111 green. UI verification still deferred to Mac/Xcode.
+- [2026-04-21] Step 15 — `SystemInfoView.swift`. Port of the read-only half of `SystemInfoEvent.c:253-323`: sectioned Form with Overview (tech level, government, size, resources, status, police activity, pirate activity — the first two joined up via `PoliticsTable` / `ActivityLabels`) and Market (ten rows showing each trade item at `gs.save.buyPrice[i]`, with `—` for zeros since `BuyPrice==0` means "not sold here" per `Src/Skill.c:142-164`). Navigation title tracks the current system name. Special events / personnel roster / newspaper buttons are deferred — they belong to flows Phase 1 doesn't cover. 111/111 tests still green.
