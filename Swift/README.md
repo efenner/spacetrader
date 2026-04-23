@@ -17,7 +17,7 @@ rationale for each choice — lives in
 
 ```
 Swift/
-├── Package.swift                   # SwiftPM manifest; iOSApp target lives here too
+├── Package.swift                   # SwiftPM manifest — two library products
 ├── PLAN.md                         # Phase-1 plan and progress log
 ├── README.md                       # this file
 ├── Sources/
@@ -28,9 +28,9 @@ Swift/
 │   │   ├── Tables/                 # TradeItems, ShipTypes, Politics, …
 │   │   ├── Systems/                # RNG, Distance, Money, Fuel, Bank, ShipPrice, Skill, Cargo
 │   │   └── Persistence/            # SaveStore (JSON) + GameOptions (UserDefaults)
-│   └── iOSApp/                     # SwiftUI executable (macOS-host-only; see below)
-│       ├── SpaceTraderApp.swift
-│       ├── ContentView.swift
+│   └── SpaceTraderUI/              # SwiftUI library (macOS/iOS only; see below)
+│       ├── Bootstrap.swift         # makeInitialGameState() helper
+│       ├── ContentView.swift       # TabView root
 │       ├── Screens/                # CommanderStatusView, SystemInfoView, BuyCargoView
 │       └── Components/             # StatRow, PriceRow
 └── Tests/
@@ -57,33 +57,87 @@ swift build
 swift test          # expect: 125 tests, 0 failures
 ```
 
-The `iOSApp` target is wrapped in `#if os(macOS)` inside
+The `SpaceTraderUI` target is wrapped in `#if os(macOS)` inside
 `Package.swift`, so on Linux its target list evaluates empty — no
 SwiftUI / UIKit dependency leaks onto the Linux build.
 
-### macOS / Xcode — full iPhone app
+### macOS — running the core tests from the CLI
 
-Requires Xcode 15 or newer.
+```bash
+cd Swift
+swift test
+```
 
-1. Open `Swift/Package.swift` directly in Xcode (File → Open…).
-2. Pick the **iOSApp** scheme at the top of the window.
-3. Choose an iPhone simulator (iOS 16 or newer).
-4. Run (⌘R).
+Requires `xcode-select -p` to point at Xcode.app (not Command Line
+Tools) so `XCTest` resolves; fix with
+`sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`
+if needed. You can also press ⌘U in Xcode with the
+`SpaceTraderCore` scheme selected — same 125 tests, prettier UI.
 
-You should see:
-- **Status** tab — commander name in the nav bar; sections for Skills
+### macOS — running the iPhone app
+
+SwiftPM doesn't produce a proper iOS `.app` bundle (no `Info.plist`
+with `CFBundleIdentifier`, no bundle structure), so we ship
+`SpaceTraderUI` as a **library** and leave a thin Xcode iOS App
+project as the hosting shell. One-time setup:
+
+1. Open Xcode. **File → New → Project → iOS → App.**
+   - Product Name: `SpaceTrader`
+   - Interface: `SwiftUI`
+   - Language: `Swift`
+   - Storage: None
+   - Save inside the repo root (e.g. `/Users/you/spacetrader/SpaceTraderApp/`).
+     This is *outside* the `Swift/` SwiftPM package directory.
+
+2. With the new project open: **File → Add Package Dependencies…**
+   → click **Add Local…** → pick the `Swift/` folder (not the root).
+   In the following dialog, link **both** products (`SpaceTraderCore`
+   and `SpaceTraderUI`) to your app target.
+
+3. Replace the generated `ContentView.swift` file content with:
+   ```swift
+   import SwiftUI
+   import SpaceTraderCore
+   import SpaceTraderUI
+
+   struct RootView: View {
+       @StateObject private var gameState =
+           SpaceTraderBootstrap.makeInitialGameState()
+
+       var body: some View {
+           ContentView().environmentObject(gameState)
+       }
+   }
+   ```
+   (You can delete the renaming wrapper and inline `RootView` into
+   the `App` struct if you prefer; keeping it separate makes the
+   `@StateObject` lifecycle explicit.)
+
+4. Open the generated `SpaceTraderApp.swift` and change its `body`:
+   ```swift
+   WindowGroup { RootView() }
+   ```
+
+5. Build & run. Pick any iOS 16+ iPhone simulator. ⌘R.
+
+You should see a three-tab SwiftUI app:
+- **Status** — commander name in the nav bar; sections for Skills
   (base / adapted), Standing (kills, police record, reputation,
   difficulty), Finances (days, credits, debt, net worth).
-- **System** tab — the current system's tech level, government, size,
+- **System** — the current system's tech level, government, size,
   resources, status, police & pirate activity, plus the ten trade-item
   buy prices (rendered as `—` when the system doesn't sell an item).
-- **Trade** tab — buy / sell one unit at a time. Disabled buttons
-  mean one of the four refusal guards from `Cargo.c:862-884` has
-  fired (too much debt, no stock, no free bays, can't afford one).
+- **Trade** — buy / sell one unit at a time. Disabled buttons mean
+  one of the four refusal guards from `Cargo.c:862-884` has fired
+  (too much debt, no stock, no free bays, can't afford one).
 
-`SaveGame` persists to `Documents/savegame.json`; the options subset
-(auto-fuel, auto-repair, ignore-X flags, etc.) lives in `UserDefaults`
-under `com.spacetrader.options` so it survives a "New Game".
+`SaveGame` persists to `Documents/savegame.json`; the options
+subset (auto-fuel, auto-repair, ignore-X flags, etc.) lives in
+`UserDefaults` under `com.spacetrader.options` so it survives a
+"New Game". Persistence load runs at app launch inside
+`SpaceTraderBootstrap.makeInitialGameState()`; wiring `save()` to
+actual game events (end-of-day, after a trade, `scenePhase ==
+.background`, …) is deliberately deferred — that's a Phase-2 call.
 
 ### Regenerating the RNG golden vector
 
@@ -93,8 +147,9 @@ any C compiler can re-verify:
 
 ```bash
 cd Tests/SpaceTraderCoreTests/Fixtures
-gcc -std=c99 -O0 -Wall -o rand_harness rand_harness.c
-./rand_harness > rand_seed_default.txt
+clang -std=c99 -O0 -Wall -o rand_harness rand_harness.c
+diff <(./rand_harness) rand_seed_default.txt     # empty = parity
+rm rand_harness                                   # binary is gitignored
 ```
 
 ## License

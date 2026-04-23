@@ -8,8 +8,10 @@
 import SwiftUI
 import SpaceTraderCore
 
-struct ContentView: View {
-    var body: some View {
+public struct ContentView: View {
+    public init() {}
+
+    public var body: some View {
         TabView {
             CommanderStatusView()
                 .tabItem { Label("Status", systemImage: "person.crop.circle") }

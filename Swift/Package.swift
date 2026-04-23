@@ -3,29 +3,34 @@
 // Space Trader — SwiftUI port
 // Derived from Space Trader 1.2.2 by Pieter Spronck (GPLv2).
 //
-// `SpaceTraderCore` is Foundation-only so it builds on Linux for CI
-// (`swift test`) and on macOS/iOS for the app. The `iOSApp` executable
-// target only exists when the package is configured on a macOS host —
-// `swift package` evaluates this file on the current host, and Linux
-// doesn't have SwiftUI / UIKit / the iOS SDK, so its target list stays
-// empty.
+// Two library targets:
+//   - SpaceTraderCore — Foundation-only, builds on Linux for CI.
+//   - SpaceTraderUI   — SwiftUI views; Apple platforms only.
+//
+// The UI layer is declared inside a `#if os(macOS)` guard so Linux
+// `swift build` + `swift test` don't try to bring in SwiftUI. On a
+// Mac both libraries are visible to Xcode, which can link them into
+// a thin Xcode iOS App project that supplies the `@main` wrapper +
+// Info.plist / bundle identifier. SwiftPM's own executableTarget
+// type doesn't produce a proper iOS `.app` bundle, so we stop short
+// of shipping one.
 
 import PackageDescription
 
 #if os(macOS)
-let iosAppTargets: [Target] = [
-    .executableTarget(
-        name: "iOSApp",
+let uiTargets: [Target] = [
+    .target(
+        name: "SpaceTraderUI",
         dependencies: ["SpaceTraderCore"],
-        path: "Sources/iOSApp"
+        path: "Sources/SpaceTraderUI"
     ),
 ]
-let iosAppProducts: [Product] = [
-    .executable(name: "iOSApp", targets: ["iOSApp"]),
+let uiProducts: [Product] = [
+    .library(name: "SpaceTraderUI", targets: ["SpaceTraderUI"]),
 ]
 #else
-let iosAppTargets: [Target] = []
-let iosAppProducts: [Product] = []
+let uiTargets: [Target] = []
+let uiProducts: [Product] = []
 #endif
 
 let package = Package(
@@ -36,7 +41,7 @@ let package = Package(
     ],
     products: [
         .library(name: "SpaceTraderCore", targets: ["SpaceTraderCore"]),
-    ] + iosAppProducts,
+    ] + uiProducts,
     targets: [
         .target(
             name: "SpaceTraderCore",
@@ -48,11 +53,15 @@ let package = Package(
             path: "Tests/SpaceTraderCoreTests",
             exclude: [
                 "Fixtures/rand_harness.c",
+                // Compiled by gcc on-demand to regenerate the RNG
+                // golden vector; .gitignored so it's only present on
+                // a Linux dev host that has built it. Mac users will
+                // see a harmless "File not found" warning here.
                 "Fixtures/rand_harness",
             ],
             resources: [
                 .copy("Fixtures/rand_seed_default.txt"),
             ]
         ),
-    ] + iosAppTargets
+    ] + uiTargets
 )

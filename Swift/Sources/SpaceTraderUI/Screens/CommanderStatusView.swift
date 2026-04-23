@@ -12,10 +12,12 @@
 import SwiftUI
 import SpaceTraderCore
 
-struct CommanderStatusView: View {
+public struct CommanderStatusView: View {
     @EnvironmentObject private var gs: GameState
 
-    var body: some View {
+    public init() {}
+
+    public var body: some View {
         NavigationStack {
             Form {
                 Section("Skills") {
